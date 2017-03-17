@@ -1,0 +1,785 @@
+function Operation() {
+	this.is_function = false;
+	this.min_args_count = undefined;
+	this.max_args_count = undefined;
+	this.args_counts = undefined;
+	this.text = undefined;
+	this.arguments_pre_position = [];
+}
+
+function Plus() {
+	Operation.call(this);
+	this.min_args_count = 1;
+	this.max_args_count = 2;
+	this.text = '+';
+	this.priority = 1;
+	this.arguments_pre_position = [false, true];
+}
+
+Plus.prototype.apply = function(args_array) {
+	if (args_array.length == 1) {
+		return args_array[0];
+	} else if (args_array.length == 2) {
+		return args_array[0] + args_array[1];
+	}
+}
+
+function Minus() {
+	Operation.call(this);
+	this.min_args_count = 1;
+	this.max_args_count = 2;
+	this.text = '-';
+	this.priority = 2;
+	this.arguments_pre_position = [false, true];
+}
+
+Minus.prototype.apply = function(args_array) {
+	if (args_array.length == 1) {
+		return -args_array[0];
+	} else if (args_array.length == 2) {
+		return -args_array[0] + args_array[1];
+	}
+}
+
+function Multiplication() {
+	Operation.call(this);
+	this.min_args_count = 2;
+	this.max_args_count = 2;
+	this.text = '*';
+	this.priority = 3;
+	this.arguments_pre_position = [false, true];
+}
+
+Multiplication.prototype.apply = function(args_array) {
+	return args_array[0] * args_array[1];
+}
+
+function Division() {
+	Operation.call(this);
+	this.min_args_count = 2;
+	this.max_args_count = 2;
+	this.text = '/';
+	this.priority = 4;
+	this.arguments_pre_position = [false, true];
+}
+
+Division.prototype.apply = function(args_array) {
+	return args_array[1] / args_array[0];
+}
+
+function Func() {
+	Operation.call(this);
+	this.is_function = true;
+}
+
+function Abs() {
+	Func.call(this);
+	this.min_args_count = 1;
+	this.max_args_count = 1;
+	this.text = 'abs';
+	this.priority = 5;
+	this.arguments_pre_position = [false];
+}
+
+Abs.prototype.apply = function(args_array) {
+	return Math.abs(args_array[0]);
+}
+
+function Sin() {
+	Func.call(this);
+	this.min_args_count = 1;
+	this.max_args_count = 1;
+	this.text = 'sin';
+	this.priority = 5;
+	this.arguments_pre_position = [false];
+}
+
+Sin.prototype.apply = function(args_array) {
+	return Math.sin(args_array[0]);
+}
+
+function Len() {
+	Func.call(this);
+	this.min_args_count = 1;
+	this.max_args_count = 1;
+	this.text = 'len';
+	this.priority = 5;
+	this.arguments_pre_position = [false];
+}
+
+Len.prototype.apply = function(args_array) {
+	if (typeof args_array[0] == "string") {
+		return args_array[0].length;
+	} else {
+		throw "argument is not a string";
+	}
+}
+
+function AccessTable(table, cell) {
+	Func.call(this);
+	this.min_args_count = 2;
+	this.max_args_count = 2;
+	this.text = 'A';
+	this.table = table;
+	this.cell = cell;
+	this.priority = 6;
+	this.arguments_pre_position = [false, false];
+}
+
+AccessTable.prototype.apply = function(args_array) {
+	if (cell[0] + '_' + cell[1] in this.table['cells'][args_array[0]][args_array[1]]['depend_on']) {
+		throw "cell (" + args_array[0] + ',' + args_array[1] + ") depends on current cell, and callnot be used in expression";
+	} else {
+		return this.table['cells'][args_array[0]][args_array[1]]['value'];
+	}
+}
+
+function ParseStackElement(type, value, original_position, stop_position) {
+	this.type = type
+	this.value = value;
+	this.original_position = original_position;
+	if (stop_position === undefined) {
+		this.stop_position = original_position + this.length();
+	} else {
+		this.stop_position = stop_position;
+	}
+}
+
+ParseStackElement.prototype.length = function () {
+	if (this.type == 'value') {
+		return String(this.value).length;
+	} else if (this.type == 'opening_bracket') {
+		return 1;
+	} else if (this.type == 'closing_bracket') {
+		return 1;
+	} else if (this.type == 'operator') {
+		return this.value.text.length;
+	}
+}
+
+var all_operations = [
+	AccessTable,
+	Plus,
+	Minus,
+	Multiplication,
+	Division,
+	Abs,
+	Sin,
+	Len,
+];
+
+function range(n, m) {
+	var result = new Set();
+	for (var i = n; i < m; ++i) {
+		result.add(i);
+	}
+
+	return result;
+}
+
+function ParseException(message, stack_element) {
+	this.message = message;
+	this.symbols = range(stack_element.original_position, stack_element.stop_position);
+}
+
+function EvalContext(expression_string, table, cell) {
+	this.expression_string = expression_string;
+	this.operand_stack = [];
+	this.operation_stack = [];
+	this.table = table;
+	this.cell = cell;
+	this.expression_string = expression_string;
+	this.current_position = 0;
+	this.max_position = this.expression_string.length;
+}
+
+EvalContext.prototype.is_over = function () {
+	return this.current_position >= this.max_position;
+}
+
+EvalContext.prototype.pass_symbol = function (symbols=1) {
+	this.expression_string = this.expression_string.substr(symbols);
+	this.current_position += symbols;
+}
+
+EvalContext.prototype.check_top_value_empty = function () {
+	return this.operand_stack.length == 0 || this.operand_stack[this.operand_stack.length - 1].type == 'opening_bracket';
+}
+
+EvalContext.prototype.eval_top_value = function () {
+	var stack_element = this.operand_stack.pop();
+	if (stack_element.type == 'opening_bracket') {
+		throw ParseException("evaling called on empty sequence", stack_element);
+	} else if (stack_element.type == 'value') {
+		return stack_element;
+	} else if (stack_element.type == 'operator') {
+		var args = [];
+		var original_positions = [];
+		var stop_positions = [];
+		for (var i = 0; i < stack_element.value.max_args_count; ++i) {
+			if (this.check_top_value_empty() && i < stack_element.value.min_args_count) {
+				throw new ParseException(
+					"too few agruments to function '" + stack_element.value.text + "'",
+					stack_element
+				);
+			} else if (this.check_top_value_empty() && i >= stack_element.value.min_args_count) {
+				break;
+			} else {
+				var arg = this.eval_top_value();
+				args.push(arg.value);
+				original_positions.push(arg.original_position);
+				stop_positions.push(arg.stop_position);
+			}
+		}
+
+		var min_original_position = Math.min.apply(0, original_positions);
+		var max_stop_position = Math.max.apply(0, stop_positions);
+
+		for (var i = 0; i < args.length; ++i) {
+			if (
+				(
+					stack_element.value.arguments_pre_position[i] &&
+					stop_positions[i] > stack_element.original_position
+				)
+				|| (
+					!stack_element.value.arguments_pre_position[i] &&
+					stack_element.stop_position > original_positions[i]
+				)
+			) {
+				throw new ParseException("wrong argument position to function '" + stack_element.value.text + "'", stack_element);
+			}
+		}
+
+		var result;
+		try {
+			result = stack_element.value.apply(args);
+		} catch (err) {
+			throw new ParseException(err, stack_element);
+		}
+
+		return new ParseStackElement('value', result, min_original_position, max_stop_position);
+	} else {
+		throw new ParseException("unexpected type " + stack_element.type, stack_element);
+	}
+}
+
+EvalContext.prototype.push_to_operands_untill_condition = function (condition) {
+	if (this.operation_stack.length > 0) {
+		var element = this.operation_stack.pop();
+		if (condition(element)) {
+			this.operation_stack.push(element);
+		} else {
+			this.operand_stack.push(element);
+			this.push_to_operands_untill_condition(condition);
+		}
+	}
+}
+
+function check_bracket(element) {
+	return element.type == 'opening_bracket';
+}
+
+function check_older_operand(operator) {
+	return function (element) {
+		return element.type == 'operator' && element.value.priority <= operator.priority || element.type == 'opening_bracket';
+	}
+}
+
+EvalContext.prototype.push_to_operand_untill_bracket = function () {
+	return this.push_to_operands_untill_condition(check_bracket);
+}
+
+EvalContext.prototype.push_to_operand_untill_older_operator = function (operator) {
+	return this.push_to_operands_untill_condition(check_older_operand(operator));
+}
+
+EvalContext.prototype.process_closing_bracket = function() {
+	this.push_to_operand_untill_bracket();
+	if (this.operand_stack.length == 0) {
+		throw new ParseException("unmatched closing bracket or comma", new ParseStackElement('closing_bracket', '', this.current_position));
+	} else if (this.operand_stack[this.operand_stack.length - 1].type == 'opening_bracket') {
+		throw new ParseException(
+			"empty expression",
+			new ParseStackElement('closing_bracket', '', this.operand_stack[this.operand_stack.length - 1].original_position, this.current_position + 1)
+		);
+	} else {
+		var num_stack_element = this.eval_top_value();
+		if (
+			this.operand_stack.length > 0
+			&& this.operand_stack[this.operand_stack.length - 1].type == 'opening_bracket'
+			&& this.operation_stack.length > 0
+			&& this.operation_stack[this.operation_stack.length - 1].type == 'opening_bracket'
+		) {
+			this.operand_stack.pop();
+			var stack_element = this.operation_stack.pop();
+			this.operand_stack.push(new ParseStackElement('value', num_stack_element.value, stack_element.original_position, this.current_position + 1));
+		} else {
+			throw new ParseException("unmatched closing bracket (or invalid expression between brackets)", new ParseStackElement('closing_bracket', ')', this.current_position));
+		}
+	}
+}
+
+EvalContext.prototype.eval_expression = function() {
+	while (this.expression_string.length > 0) {
+		if (this.expression_string[0] == ' ') {
+			this.pass_symbol();
+		} else if (this.expression_string[0] == '(') {
+			this.operation_stack.push(new ParseStackElement('opening_bracket', '(', this.current_position));
+			this.operand_stack.push(new ParseStackElement('opening_bracket', '(', this.current_position));
+			this.pass_symbol();
+		} else if (this.expression_string[0] == ',') {
+			this.process_closing_bracket();
+			this.operation_stack.push(new ParseStackElement('opening_bracket', '(', this.current_position));
+			this.operand_stack.push(new ParseStackElement('opening_bracket', '(', this.current_position));
+			this.pass_symbol();
+		} else if (this.expression_string[0] == ')') {
+			this.process_closing_bracket();
+			this.pass_symbol();
+		} else if (this.expression_string[0] == '"') {
+			var index_of_next_bracket = this.expression_string.substr(1).indexOf('"') + 1;
+			if (index_of_next_bracket == 0) {
+				throw new ParseException('unmatched quote', new ParseStackElement('value', '"', this.current_position))
+			} else {
+				this.operand_stack.push(new ParseStackElement('value', this.expression_string.substr(1, index_of_next_bracket - 1), this.current_position));
+				this.pass_symbol(index_of_next_bracket + 1);
+			}
+		} else if (this.expression_string[0] >= '0' && this.expression_string[0] <= '9' &&  !isNaN(parseFloat(this.expression_string))) {
+			var value = parseFloat(this.expression_string);
+			this.operand_stack.push(new ParseStackElement('value', value, this.current_position));
+			this.pass_symbol(String(value).length);
+		} else {
+			var found_function = false;
+			for (var i = 0; i < all_operations.length; ++i) {
+				var operation = new all_operations[i](this.table, this.cell);
+				if (this.expression_string.indexOf(operation.text) == 0) {
+					this.push_to_operand_untill_older_operator(operation);
+					this.operation_stack.push(new ParseStackElement('operator', operation, this.current_position));
+					this.pass_symbol(operation.text.length);
+					found_function = true;
+					break;
+				}
+			}
+			if (!found_function) {
+				throw new ParseException("unparsable entity", new ParseStackElement('value', this.expression_string, this.current_position));
+			}
+		}
+	}
+
+	this.push_to_operand_untill_bracket();
+	if (this.operation_stack.length == 0) {
+		if (this.check_top_value_empty()) {
+			throw new ParseException("empty expression", new ParseStackElement('value', ' ', this.current_position));
+		} else {
+			var stack_element = this.eval_top_value();
+			if (this.operand_stack.length == 0) {
+				return stack_element.value;
+			} else {
+				throw new ParseException("garbage found in expression", this.operand_stack.pop());
+			}
+		}
+	} else {
+		throw new ParseException("unmatched opening bracket", this.operation_stack.pop());
+	}
+}
+
+
+$(function () {
+	function with_dots(string) {
+		if (string.length > 3) {
+			return string.substring(0, 3) + "...";
+		} else {
+			return string;
+		}
+	}
+
+	new State({
+		'start': new Combine([
+			new Executer(function(context) {
+				context.tables = JSON.parse(localStorage.getItem("tables") || '{}')
+			}),
+			new Builder({
+				'container': $('#center'),
+			    	'func': function(context, container) {
+					container.append(`
+						<div  class="input-group" role=group style="text-align:center; margin-top:15%">
+							<a href="#" id=new_table class="list-group-item">Новая таблица</a>
+							<a href="#" id=load_table class="list-group-item">Загрузить таблицу</a>
+							<a href="#" id=delete_table class="list-group-item">Удалить таблицу</a>
+						</div>
+					`);
+				},
+			}),
+			new GoTo({
+				'type': 'substate',
+				'new_state': 'start_page::listen',
+			}),
+		]),
+		'start_page::listen': new Combine([
+			new Binder({
+				'action': 'click',
+				'target': function() {
+					return $('#new_table');
+				},
+				'type': 'next',
+				'new_state': 'start_page::init_new_dialog',
+			}),
+			new Binder({
+				'action': 'click',
+				'target': function() {
+					return $('#load_table');
+				},
+				'type': 'exit_state',
+				'new_state': 'init_tables_list',
+			}),
+			new Binder({
+				'action': 'click',
+				'target': function() {
+					return $('#delete_table');
+				},
+				'type': 'exit_state',
+				'new_state': 'delete_table',
+			}),
+		]),
+		'delete_table': new Combine([
+			new Builder({
+				'container': $("#center"),
+				'func': function(context, container) {
+					var html = '<div  class="input-group" role=group style="overflow-x: hidden;  height: auto; text-align:center; margin-top:15%">';
+					for (table_name in context.tables) {
+						html += '<a href="#" table_name="' + table_name + '" class="list-group-item table_delete"> Удалить: ' + table_name + '</a>';
+					}
+					html += '<a href=# id=go_back class="list-group-item">Вернуться</a>';
+					html += '</div>';
+					container.append(html);
+				},
+			}),
+			new GoTo({
+				'type': 'substate',
+				'new_state': 'delete_table::listen',
+			}),
+		]),
+		'delete_table::listen': new Combine([
+			new Binder({
+				'action': 'click',
+				'target': function () {
+					return $('.table_delete');
+				},
+				'write_to': 'table',
+				'type': 'next',
+				'new_state': 'delete_table::delete',
+			}),
+			new Binder({
+				'action': 'click',
+				'target': function() {
+					return $('#go_back');
+				},
+				'type': 'exit_state',
+				'new_state': 'start',
+			}),
+		]),
+		'delete_table::delete': new Combine([
+			new Executer(function(context) {
+				var table_name = context.table.attr('table_name');
+				if (table_name in context.parent.tables) {
+					delete context.parent.tables[table_name];
+					localStorage.setItem("tables", JSON.stringify(context.parent.tables))
+				}
+			}),
+			new GoTo({
+				'type': 'exit_state',
+				'new_state': 'delete_table',
+			}),
+		]),
+		'init_tables_list': new Combine([
+			new Builder({
+				'container': $("#center"),
+		       		'func': function(context, container) {
+					var html = '<div  class="input-group" role=group style="overflow-x: hidden;  height: auto; text-align:center; margin-top:15%">';
+					for (table_name in context.tables) {
+						html += '<a href="#" table_name="' + table_name + '" class="list-group-item table_choice"> Открыть: ' + table_name + '</a>';
+					}
+					html += '<a href=# id=go_back class="list-group-item">Вернуться</a>';
+					html += '</div>';
+					container.append(html);
+				}
+			}),
+			new GoTo({
+				'type': 'substate',
+				'new_state': 'init_tables_list::listen',
+			}),
+		]),
+		'init_tables_list::listen': new Combine([
+			new Binder({
+				'action': 'click',
+				'target': function () {
+					return $('.table_choice');
+				},
+				'write_to': 'table',
+				'type': 'next',
+				'new_state': 'init_tables_list::prepare_edit_table',
+			}),
+			new Binder({
+				'action': 'click',
+				'target': function() {
+					return $('#go_back');
+				},
+				'type': 'exit_state',
+				'new_state': 'start',
+			}),
+		]),
+		'init_tables_list::prepare_edit_table': new Combine([
+			new Executer(function(context) {
+				context.parent.cur_table = context.parent.tables[context.table.attr('table_name')];
+			}),
+			new GoTo({
+				'type': 'exit_state',
+				'new_state': 'edit_table',
+			}),
+		]),
+		'start_page::init_new_dialog': new Combine([
+			new BDialog({
+				'id': 'new_dialog',
+				'title': 'New table',
+				'data': function (context) {
+					return `
+						<div class="input-group">
+							<span class="input-group-addon" id="basic-addon1">
+								Table name
+							</span>
+							<input
+
+								 type="text"
+								 class="form-control"
+								 placeholder="new_table_name"
+								 aria-describedby="basic-addon1"
+								 id=new_table_name
+							>
+						</div><br>
+					`;
+				},
+				'buttons' : '<button id=Ok type="button" class="btn btn-default">Ok</button>',
+			}),
+			new GoTo({
+				'type' : 'substate',
+				'new_state' : 'start_page::init_new_dialog::listen',
+			}),
+		]),
+		'start_page::init_new_dialog::listen': new Combine([
+			new Binder({
+				'action' : 'click',
+				'target' : function() {
+					return $('#Ok');
+				},
+				'type' : 'next',
+				'new_state' : 'start_page::init_new_dialog::check_table_name',
+			}),
+			new Binder({
+				'target' : function() {
+					return $('#close');
+				},
+				'action' : 'click',
+				'type' : 'exit_state',
+				'new_state' : 'start_page::listen',
+			}),
+		]),
+		'start_page::init_new_dialog::check_table_name': new GoTo({
+			'depth': 2,
+			'type': function(context) {
+				if ($('#new_table_name').val() in context.parent.parent.tables) {
+					return 'next';
+				} else {
+					return 'exit_state';
+				}
+			},
+			'new_state': function (context) {
+				if ($('#new_table_name').val() in context.parent.parent.tables) {
+					alert('Table with name ' +  $('#new_table_name').val() + ' already exists.');
+					return 'start_page::init_new_dialog::listen';
+				} else {
+					var cur_table =  context.parent.parent.cur_table = context.parent.parent.tables[$("#new_table_name").val()] = {};
+					cur_table['cells'] = Array(20);
+					for (var i = 0; i < 20; ++i) {
+						cur_table['cells'][i] = Array(20);
+						for (var j = 0; j < 20; ++j) {
+							cur_table['cells'][i][j] = {};
+							cur_table['cells'][i][j]['formula'] = '';
+						}
+					}
+					localStorage.setItem("tables", JSON.stringify(context.parent.parent.tables))
+					return 'edit_table';
+				}
+			},
+		}),
+		'edit_table': new Combine([
+			new Builder({
+				'container': $('#center'),
+				'func': function(context, container) {
+					var html_table = "<table border=3>";
+					for (var i = 0; i < 20; ++i) {
+						html_table += "<tr>";
+						for (var j = 0; j < 20; ++j) {
+							html_table += (
+								"<td> <div class=cell style='min-width:50px; min-height:50px' row=" + i + " col=" + j + " id=cell_" + i + "_" + j + ">"
+									+ with_dots(context.cur_table['cells'][i][j]['formula'])
+								+ "</div></td>"
+							);
+						}
+						html_table += "</tr>";
+					}
+					html_table += "</table>";
+					container.append(`
+						<div class="input-group" role=group style="text-align:center;">
+							<a href="#" id=exit_editing class="list-group-item"> В главное меню </a>
+							<a href="#" id=another_table class="list-group-item"> Загрузить другую таблицу </a>
+						</div>
+					`);
+					container.append(html_table);
+				},
+			}),
+			new GoTo({
+				'type': 'substate',
+				'new_state': 'edit_table::listen',
+			}),
+		]),
+		'edit_table::listen': new Combine([
+			new Binder({
+				'action': 'click',
+				'target': function () {
+					return $('.cell');
+				},
+				'write_to': 'cell',
+				'type': 'next',
+				'new_state': 'edit_table::formula_dialog',
+			}),
+			new Binder({
+				'action': 'click',
+				'target': function () {
+					return $('#exit_editing');
+				},
+				'type': 'exit_state',
+				'new_state': 'start',
+			}),
+			new Binder({
+				'action': 'click',
+				'target': function () {
+					return $('#another_table');
+				},
+				'type': 'exit_state',
+				'new_state': 'init_tables_list',
+			}),
+		]),
+		'edit_table::formula_dialog': new Combine([
+			new BDialog({
+				'id': 'formula_dialog',
+				'title': 'Enter formula',
+				'data' : function (context) {
+					var cell = context.cell;
+					var formula = context.parent.cur_table['cells'][cell.attr('row')][cell.attr('col')]['formula'];
+					return `
+						<div class="input-group">
+							<span class="input-group-addon" id="basic-addon1">
+								Formula
+							</span>
+							<input
+
+								 type="text"
+								 class="form-control"
+								 placeholder="formula"
+								 aria-describedby="basic-addon1"
+								 id=formula
+								 value='` + formula + `'
+							>
+						</div><br>
+						<div id=parse_error>
+						</div><br>
+						<div id=colored_output>
+						</div>
+					`;
+				},
+				'buttons' : '<button id=Ok type="button" class="btn btn-default">Ok</button>',
+			}),
+			new GoTo({
+				'type': 'substate',
+				'new_state': 'edit_table::formula_dialog::listen',
+			}),
+		]),
+		'edit_table::formula_dialog::listen': new Combine([
+			new Binder({
+				'action' : 'click',
+				'target' : function() {
+					return $('#Ok');
+				},
+				'type' : 'next',
+				'new_state' : 'edit_table::formula_dialog::eval_formula',
+			}),
+			new Binder({
+				'target' : function() {
+					return $('#close');
+				},
+				'action' : 'click',
+				'type' : 'exit_state',
+				'new_state' : 'edit_table::listen',
+			}),
+		]),
+		'edit_table::formula_dialog::eval_formula': new Combine([
+			new Executer(function (context) {
+				context.good_formula = false;
+				var formula = $('#formula').val();
+				try {
+					var eval_context = new EvalContext(formula, context.parent.parent.cur_table, context.parent.cell);
+					context.error = eval_context.eval_expression();
+				} catch (err) {
+					context.good_formula = false;
+					context.error = err;
+					console.log(err);
+				}
+				//Evaling formula
+//				context.error = "wrong something";
+				var cell = context.parent.cell;
+				context.parent.parent.cur_table['cells'][cell.attr('row')][cell.attr('col')]['formula'] = $('#formula').val();
+				localStorage.setItem("tables", JSON.stringify(context.parent.parent.tables))
+				cell.text(with_dots($('#formula').val()));
+			}),
+			new GoTo({
+				'type': function(context) {
+					if (context.good_formula) {
+						return 'exit_state';
+					} else {
+						return 'next';
+					}
+				},
+				'new_state': function(context) {
+					$('#colored_output').html('');
+					$('#parse_error').html('');
+					if (context.good_formula) {
+						return 'edit_table::listen';
+					} else {
+						if (context.error instanceof ParseException) {
+							$('#parse_error').html(context.error.message);
+							var colored_output = "";
+							var is_red = false;
+							var formula = $('#formula').val();
+							for (var i = 0; i < formula.length; ++i) {
+								if (context.error.symbols.has(i) && !is_red) {
+									colored_output += "<font color=red>";
+									is_red = true;
+								} else if (!context.error.symbols.has(i) && is_red) {
+									colored_output += "</font>";
+									is_red = false;
+								}
+								colored_output += formula[i];
+							}
+							if (is_red) {
+								colored_output += "</font>";
+							}
+							$('#colored_output').html(colored_output);
+						} else {
+							$('#parse_error').html(context.error);
+						}
+						return 'edit_table::formula_dialog::listen';
+					}
+				},
+			}),
+		]),
+	});
+});
