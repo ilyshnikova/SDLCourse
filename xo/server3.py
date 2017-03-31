@@ -46,7 +46,7 @@ class Game(object):
         return self.is_active() and (player == self.first_player and self.turn == 1 or player == self.second_player and self.turn == 2)
 
     def is_active(self):
-        return self.first_player is not None and self.second_player is not None
+        return self.first_player is not None and self.second_player is not None and not(self.finished)
 
     def send_to_player(self, player, *events):
         for event in events:
@@ -101,7 +101,37 @@ class Game(object):
         if point not in self.field:
             self.field[point] = self.turn
             self.send_field()
-            self.switch_turns()
+            if self.check_finish(point):
+                self.send_finish()
+                self.finished = True
+            else:
+                self.switch_turns()
+
+    def send_finish(self):
+        if self.turn == 1:
+            self.send_to_player(
+                self.first_player,
+                {'status': 'You have won', 'action': 'status_update'}
+            )
+            self.send_to_player(
+                self.second_player,
+                {'status': 'You have lost', 'action': 'status_update'}
+            )
+        else:
+            self.send_to_player(
+                self.second_player,
+                {'status': 'You have won', 'action': 'status_update'}
+            )
+            self.send_to_player(
+                self.first_player,
+                {'status': 'You have lost', 'action': 'status_update'}
+            )
+
+    def check_finish(self, point):
+        if len(self.field) > 3:
+            return True
+        else:
+            return False
 
     def move_left(self):
         self.game_offset_y -= 1
@@ -184,7 +214,12 @@ async def consumer_handler(websocket, path):
                 pass
             game.reset_events()
 
-            await websocket.send(json.dumps({'action': 'ping'}))
+            if game.finished:
+                await asyncio.sleep(3)
+                await game.first_player.send(json.dumps({'action': 'refresh'}))
+                await game.second_player.send(json.dumps({'action': 'refresh'}))
+            else:
+                await websocket.send(json.dumps({'action': 'ping'}))
         except:
             print("error:", sys.exc_info()[0])
             game.reset_events()

@@ -47,7 +47,9 @@
 							}
 							$('#cell_' + cell[0] + "_" + cell[1]).html(symbol);
 						}
-					}
+                    } else if (message['action'] == 'refresh') {
+                        location.reload();
+                    }
 				};
 				$('.cell').click(function() {
 					send(JSON.stringify({'action': 'mark_point', 'x': $(this).attr('row'), 'y': $(this).attr('col')}));
