@@ -5,6 +5,7 @@ import datetime
 import random
 import json
 import sys
+import traceback
 
 class Game(object):
     def __init__(self):
@@ -127,11 +128,30 @@ class Game(object):
                 {'status': 'You have lost', 'action': 'status_update'}
             )
 
+    def count(self, point, forward_action, backward_action):
+        symbol = self.field[point]
+        another = point
+        while another in self.field and self.field[another] == symbol:
+            another = backward_action(another)
+
+        result = 0
+        another = forward_action(another)
+        while another in self.field and self.field[another] == symbol:
+            result += 1
+            another = forward_action(another)
+
+        return result
+
     def check_finish(self, point):
-        if len(self.field) > 3:
-            return True
-        else:
-            return False
+        def pair_sum(first, second):
+            return (first[0] + second[0], first[1] + second[1])
+
+        def negative(pair):
+            return (-pair[0], -pair[1])
+
+        for vector in ((1, 0), (0, 1), (1, 1), (1, -1)):
+            if self.count(point, lambda p: pair_sum(p, vector), lambda p: pair_sum(p, negative(vector))) >= 5:
+                return True
 
     def move_left(self):
         self.game_offset_y -= 1
@@ -221,7 +241,7 @@ async def consumer_handler(websocket, path):
             else:
                 await websocket.send(json.dumps({'action': 'ping'}))
         except:
-            print("error:", sys.exc_info()[0])
+            print(traceback.print_exc(file=sys.stdout))
             game.reset_events()
             game_controller.remove_client(websocket)
 
