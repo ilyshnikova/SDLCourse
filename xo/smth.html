@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html>
+	<head>
+		<title>WebSocket demo</title>
+	</head>
+	<body>
+		<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.0/jquery.min.js"></script>
+		<script>
+			$(function() {
+				var ws = new WebSocket("ws://localhost:8888/");
+				waitForConnection = function (callback, interval) {
+					if (ws.readyState === 1) {
+						callback();
+					} else {
+						setTimeout(function () {
+							waitForConnection(callback, interval);
+						}, interval);
+					}
+				};
+
+				send = function (message) {
+					waitForConnection(function () {
+					ws.send(message);
+					if (typeof callback !== 'undefined') {
+							callback();
+						}
+					}, 1000);
+				};
+
+				send(JSON.stringify({'action': 'start'}));
+				ws.onmessage = function (event) {
+					message = JSON.parse(event.data);
+					console.log(message);
+					if (message['action'] == 'status_update') {
+						$('#status').html(message['status']);
+					} else if (message['action'] == 'update_field') {
+						for (var i = 0; i < message['field'].length; ++i) {
+							var cell = message['field'][i];
+							var numberPos = cell[2];
+							var symbol = undefined;
+							if (numberPos == 0) {
+								symbol = '';
+							} else if (numberPos == 1) {
+								symbol = 'X';
+							} else if (numberPos == 2) {
+								symbol = 'O';
+							}
+							$('#cell_' + cell[0] + "_" + cell[1]).html(symbol);
+						}
+					}
+				};
+				$('.cell').click(function() {
+					send(JSON.stringify({'action': 'mark_point', 'x': $(this).attr('row'), 'y': $(this).attr('col')}));
+				});
+				document.onkeydown = function (e) {
+					e = e || window.event;
+					if (e.keyCode == '38') {
+						send(JSON.stringify({'action': 'move_up'}));
+					} else if (e.keyCode == '40') {
+						send(JSON.stringify({'action': 'move_down'}));
+					} else if (e.keyCode == '37') {
+						send(JSON.stringify({'action': 'move_left'}));
+					} else if (e.keyCode == '39') {
+						send(JSON.stringify({'action': 'move_right'}));
+					}
+				};
+			});
+		</script>
+		<center>
+			<span id=status></span>
+			<table border="3"><tbody><tr>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="0" col="0" id="cell_0_0"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="0" col="1" id="cell_0_1"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="0" col="2" id="cell_0_2"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="0" col="3" id="cell_0_3"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="0" col="4" id="cell_0_4"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="0" col="5" id="cell_0_5"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="0" col="6" id="cell_0_6"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="0" col="7" id="cell_0_7"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="0" col="8" id="cell_0_8"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="0" col="9" id="cell_0_9"></div></td>
+
+</tr>
+<tr>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="1" col="0" id="cell_1_0"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="1" col="1" id="cell_1_1"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="1" col="2" id="cell_1_2"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="1" col="3" id="cell_1_3"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="1" col="4" id="cell_1_4"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="1" col="5" id="cell_1_5"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="1" col="6" id="cell_1_6"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="1" col="7" id="cell_1_7"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="1" col="8" id="cell_1_8"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="1" col="9" id="cell_1_9"></div></td>
+
+</tr>
+<tr>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="2" col="0" id="cell_2_0"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="2" col="1" id="cell_2_1"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="2" col="2" id="cell_2_2"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="2" col="3" id="cell_2_3"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="2" col="4" id="cell_2_4"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="2" col="5" id="cell_2_5"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="2" col="6" id="cell_2_6"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="2" col="7" id="cell_2_7"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="2" col="8" id="cell_2_8"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="2" col="9" id="cell_2_9"></div></td>
+
+</tr>
+<tr>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="3" col="0" id="cell_3_0"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="3" col="1" id="cell_3_1"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="3" col="2" id="cell_3_2"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="3" col="3" id="cell_3_3"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="3" col="4" id="cell_3_4"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="3" col="5" id="cell_3_5"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="3" col="6" id="cell_3_6"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="3" col="7" id="cell_3_7"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="3" col="8" id="cell_3_8"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="3" col="9" id="cell_3_9"></div></td>
+
+</tr>
+<tr>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="4" col="0" id="cell_4_0"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="4" col="1" id="cell_4_1"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="4" col="2" id="cell_4_2"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="4" col="3" id="cell_4_3"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="4" col="4" id="cell_4_4"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="4" col="5" id="cell_4_5"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="4" col="6" id="cell_4_6"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="4" col="7" id="cell_4_7"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="4" col="8" id="cell_4_8"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="4" col="9" id="cell_4_9"></div></td>
+</tr>
+<tr>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="5" col="0" id="cell_5_0"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="5" col="1" id="cell_5_1"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="5" col="2" id="cell_5_2"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="5" col="3" id="cell_5_3"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="5" col="4" id="cell_5_4"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="5" col="5" id="cell_5_5"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="5" col="6" id="cell_5_6"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="5" col="7" id="cell_5_7"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="5" col="8" id="cell_5_8"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="5" col="9" id="cell_5_9"></div></td>
+</tr>
+<tr>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="6" col="0" id="cell_6_0"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="6" col="1" id="cell_6_1"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="6" col="2" id="cell_6_2"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="6" col="3" id="cell_6_3"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="6" col="4" id="cell_6_4"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="6" col="5" id="cell_6_5"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="6" col="6" id="cell_6_6"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="6" col="7" id="cell_6_7"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="6" col="8" id="cell_6_8"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="6" col="9" id="cell_6_9"></div></td>
+</tr>
+<tr>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="7" col="0" id="cell_7_0"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="7" col="1" id="cell_7_1"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="7" col="2" id="cell_7_2"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="7" col="3" id="cell_7_3"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="7" col="4" id="cell_7_4"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="7" col="5" id="cell_7_5"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="7" col="6" id="cell_7_6"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="7" col="7" id="cell_7_7"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="7" col="8" id="cell_7_8"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="7" col="9" id="cell_7_9"></div></td>
+</tr>
+<tr>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="8" col="0" id="cell_8_0"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="8" col="1" id="cell_8_1"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="8" col="2" id="cell_8_2"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="8" col="3" id="cell_8_3"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="8" col="4" id="cell_8_4"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="8" col="5" id="cell_8_5"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="8" col="6" id="cell_8_6"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="8" col="7" id="cell_8_7"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="8" col="8" id="cell_8_8"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="8" col="9" id="cell_8_9"></div></td>
+</tr>
+<tr>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="9" col="0" id="cell_9_0"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="9" col="1" id="cell_9_1"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="9" col="2" id="cell_9_2"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="9" col="3" id="cell_9_3"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="9" col="4" id="cell_9_4"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="9" col="5" id="cell_9_5"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="9" col="6" id="cell_9_6"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="9" col="7" id="cell_9_7"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="9" col="8" id="cell_9_8"></div></td>
+<td> <div class="cell" style="min-width:50px; min-height:50px;text-align:center;vertical-align:middle" row="9" col="9" id="cell_9_9"></div></td>
+</tr>
+</tbody></table>
+
+		</center>
+	</body>
+</html>
